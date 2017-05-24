@@ -370,6 +370,12 @@ void display( void )
 
     view = Translate(0.0, 0.0, -viewDist);
 
+    //---------
+    mat4 xrot = RotateX(camRotUpAndOverDeg);
+    mat4 yrot = RotateY(camRotSidewaysDeg);
+    view = view * xrot * yrot;
+    //--------
+    
     SceneObject lightObj1 = sceneObjs[1]; 
     vec4 lightPosition = view * lightObj1.loc ;
 

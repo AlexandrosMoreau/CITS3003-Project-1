@@ -45,6 +45,7 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
-project/LINUX_VERSIONS/libassimp.so
-project/LINUX_VERSIONS/libGLEW.so
-project/LINUX_VERSIONS/libassimp.so.3
+
+project/MAC_VERSIONS/assimp_log.txt
+project/MAC_VERSIONS/scene-start
+project/MAC_VERSIONS/scene-start.dSYM
