@@ -174,7 +174,7 @@ vec2 clickPrev;
 
 static void activateTool(int button) {
     currButton = button;
-    clickPrev = currMouseXYscreen(mouseX, mouseY);
+    prevPos = currMouseXYscreen(mouseX, mouseY);
 
     // std::cout << clickOrigin << std::endl;  // For debugging
 }
