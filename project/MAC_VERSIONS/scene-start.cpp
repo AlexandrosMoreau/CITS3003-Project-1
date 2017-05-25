@@ -341,6 +341,12 @@ void drawMesh(SceneObject sceneObj)
 
     mat4 model = Translate(sceneObj.loc) * Scale(sceneObj.scale);
 
+    //---------
+    mat4 xrot = RotateX(-sceneObj.angles[0]);
+    mat4 yrot = RotateY(sceneObj.angles[1]);
+    mat4 zrot = RotateZ(sceneObj.angles[2]);
+    model = model * xrot * yrot * zrot;
+    //--------
 
     // Set the model-view matrix for the shaders
     glUniformMatrix4fv( modelViewU, 1, GL_TRUE, view * model );
