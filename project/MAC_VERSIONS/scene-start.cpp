@@ -174,6 +174,7 @@ static void mouseClickOrScroll(int button, int state, int x, int y)
     else if (button==GLUT_MIDDLE_BUTTON && state==GLUT_UP) deactivateTool();
 
     else if (button == 3) { // scroll up
+        
         viewDist = (viewDist < 0.0 ? viewDist : viewDist*0.8) - 0.05;
     }
     else if (button == 4) { // scroll down
@@ -450,6 +451,20 @@ static void adjustBlueBrightness(vec2 bl_br)
     sceneObjs[toolObj].brightness+=bl_br[1];
 }
 
+static void adjustShineSpecular(vec2 sh_sp)
+{
+    sceneObjs[toolObj].specular+=sh_sp[0];
+    sceneObjs[toolObj].shine+=sh_sp[1];
+}
+
+static void adjustAmbientDiffuse(vec2 am_df)
+{
+    sceneObjs[toolObj].ambient+=am_df[0];
+    sceneObjs[toolObj].diffuse+=am_df[1];
+}
+
+
+
 static void lightMenu(int id)
 {
     deactivateTool();
@@ -501,6 +516,11 @@ static void materialMenu(int id)
         setToolCallbacks(adjustRedGreen, mat2(1, 0, 0, 1),
                          adjustBlueBrightness, mat2(1, 0, 0, 1) );
     }
+    if (id==20) {
+        toolObj = currObject;
+        setToolCallbacks(adjustAmbientDiffuse, mat2(1, 0, 0, 1),
+                         adjustShineSpecular, mat2(1, 0, 0, 10) );
+    }
     // You'll need to fill in the remaining menu items here.                                                
     else {
         printf("Error in materialMenu\n");
@@ -542,7 +562,7 @@ static void makeMenu()
 
     int materialMenuId = glutCreateMenu(materialMenu);
     glutAddMenuEntry("R/G/B/All",10);
-    glutAddMenuEntry("UNIMPLEMENTED: Ambient/Diffuse/Specular/Shine",20);
+    glutAddMenuEntry("Ambient/Diffuse/Specular/Shine",20);
 
     int texMenuId = createArrayMenu(numTextures, textureMenuEntries, texMenu);
     int groundMenuId = createArrayMenu(numTextures, textureMenuEntries, groundMenu);
@@ -593,19 +613,17 @@ void reshape( int width, int height )
 
     glViewport(0, 0, width, height);
 
-    // You'll need to modify this so that the view is similar to that in the
-    // sample solution.
-    // In particular: 
-    //     - the view should include "closer" visible objects (slightly tricky)
-    //     - when the width is less than the height, the view should adjust so
-    //         that the same part of the scene is visible across the width of
-    //         the window.
-
-    GLfloat nearDist = 0.2;
+    GLfloat nearDist = 0.01;
+    
+    GLfloat near = nearDist;
+    
+    if(width < height)
+        near = near * (float)width/(float)height;
+    
     projection = Frustum(-nearDist*(float)width/(float)height,
-                         nearDist*(float)width/(float)height,
-                         -nearDist, nearDist,
-                         nearDist, 100.0);
+                        nearDist*(float)width/(float)height,
+                        -nearDist, nearDist,
+                        near, 100.0);
 }
 
 //----------------------------------------------------------------------------
