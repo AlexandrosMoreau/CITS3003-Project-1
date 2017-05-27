@@ -479,6 +479,12 @@ static void lightMenu(int id)
         setToolCallbacks(adjustRedGreen, mat2(1.0, 0, 0, 1.0),
                          adjustBlueBrightness, mat2(1.0, 0, 0, 1.0) );
     }
+    else if (id == 80) {
+        toolObj = 2;
+        setToolCallbacks(adjustLocXZ, camRotZ(),
+                         adjustBrightnessY, mat2( 1.0, 0.0, 0.0, 10.0) );
+        
+    }
     else {
         printf("Error in lightMenu\n");
         exit(1);
