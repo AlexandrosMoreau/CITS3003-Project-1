@@ -15,9 +15,8 @@ uniform struct Light {
     vec3 rgb;
     float brightness;
     float attenuation;
-    //float coneAngle;
-    vec3 coneDirection;
     bool directional;
+    float angle;
 } Lights[MAX_LIGHTS];
 
 void main()
@@ -34,33 +33,29 @@ void main()
     for(int i =0; i < numLights; i++)
     {
         // Unit direction vectors for Blinn-Phong shading calculation
-        vec3 lightDir;
-        lightDir = normalize(Lights[i].position.xyz - pos);  // Direction to the light source
+        vec3 lightDir = normalize(Lights[i].position.xyz - pos);  // Direction to the light source
         float lightDist = length(Lights[i].position.xyz - pos);
         float attenuation = 1.0 / (1.0  + Lights[i].attenuation * pow(lightDist, 2.0));
-        
-        if(Lights[i].position.w == 0.0)
-        {
-            lightDir = normalize(Lights[i].position.xyz);
-        }
-        
+        float brightness = Lights[i].brightness;
+        vec3 lightColour = Lights[i].rgb;
+
         //Directional light
-        /*if(Lights[i].directional) {
-            float coneAngle = 5.0;
-            float lightToSurfaceAngle = degrees(acos(dot(-normalize(Lights[i].position.xyz), normalize(Lights[i].coneDirection))));
-            if(lightToSurfaceAngle > coneAngle){
-                attenuation = 0.0;
-            }
-        }*/
+        if(Lights[i].directional) {
+            float angleModifier = abs(degrees(Lights[i].angle)/90.0);
+            brightness = brightness * angleModifier;
+            lightColour.r = colour.r +(200.0 + 55.0*angleModifier)/255.0;
+            lightColour.g = colour.g +(125.0 + 130.0*angleModifier)/255.0;
+            lightColour.b = colour.b +(90.0 + 165.0*angleModifier)/255.0;
+        }
         
         vec3 halfway = normalize(lightDir + viewDir);  // Halfway vector
 
         
         // Compute terms in the illumination equation
-        vec3 ambient =  AmbientProduct * surfaceColour.rgb * attenuation * Lights[i].rgb;
+        vec3 ambient =  AmbientProduct * surfaceColour.rgb * attenuation;
         
         float Kd = max(dot(lightDir, N), 0.0);
-        vec3 diffuse = Kd * DiffuseProduct * surfaceColour.rgb * Lights[i].rgb;
+        vec3 diffuse = Kd * DiffuseProduct * surfaceColour.rgb;
         
         float Ks = pow(max(dot(N, halfway), 0.0), Shininess);
         vec3 specular = Ks * SpecularProduct * Lights[i].rgb;
@@ -69,7 +64,7 @@ void main()
         if (dot(lightDir, N) < 0.0) {
             specular = vec3(0.0, 0.0, 0.0);
         }
-        colour.rgb += attenuation * Lights[i].brightness * (ambient + diffuse + specular);
+        colour.rgb += attenuation * brightness * lightColour * (ambient + diffuse + specular);
     }
     gl_FragColor = colour;
 }

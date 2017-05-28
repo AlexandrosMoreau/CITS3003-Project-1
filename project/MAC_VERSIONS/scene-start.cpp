@@ -279,12 +279,13 @@ static void addLight(bool directional)
     sceneObjs[nObjects-1].attenuation = 5.0;
     sceneObjs[nObjects-1].brightness = 10.0;
     sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 1.0);
-    if(directional)
-    {
-        //sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 0);
-    }
     sceneObjs[nObjects-1].scale = 0.1;
     sceneObjs[nObjects-1].texId = 0; // Plain texture
+    if(directional)
+    {
+        sceneObjs[nObjects-1].attenuation = 0.0;
+        sceneObjs[nObjects-1].brightness = 1.0;
+    }
 }
 
 //------The init function-----------------------------------------------------
@@ -326,16 +327,19 @@ void init( void )
     // first light
     addLight(false);
     sceneObjs[1].loc = vec4(2.0, 1.0, 1.0, 1.0);
+    sceneObjs[1].brightness = 0.0;
     
     // second light
     addLight(true);
     sceneObjs[2].scale = 0.2;
-  //  sceneObjs[2].brightness = 40;
-//    sceneObjs[2].attenuation = 20;
+    //sceneObjs[2].brightness = 1.0;
+    //sceneObjs[2].attenuation = 0.0;
     //sceneObjs[2].rgb = vec3(1, 0, 0);
 
     addObject(rand() % numMeshes); // A test mesh
-
+    //addObject(42); // A test mesh
+    //sceneObjs[3].scale = 0.02;
+    
     // We need to enable the depth test to discard fragments that
     // are behind previously drawn fragments for the same pixel.
     glEnable( GL_DEPTH_TEST );
@@ -397,11 +401,11 @@ void LightUniform(int lightIndex, vec4 position, SceneObject light) {
     ss << "Lights[" << lightIndex << "].";
     std::string uniformName = ss.str();
     
-    //atan(Lights[i].position.z/length(Lights[i].position.xy));
+    float lightAngle = atan(light.loc.y/sqrt(pow(light.loc.x, 2)+pow(light.loc.z, 2)));
     
     glUniform4fv(glGetUniformLocation(shaderProgram, (uniformName + "position").c_str()), 1, position);
     glUniform3fv(glGetUniformLocation(shaderProgram, (uniformName + "rgb").c_str()), 1, light.rgb);
-    glUniform3fv(glGetUniformLocation(shaderProgram, (uniformName + "coneDirection").c_str()), 1, vec3(0,0,-1));
+    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "angle").c_str()), lightAngle);
     glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "brightness").c_str()), light.brightness);
     glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "attenuation").c_str()), light.attenuation);
     glUniform1i(glGetUniformLocation(shaderProgram, (uniformName + "directional").c_str()), light.directional);
