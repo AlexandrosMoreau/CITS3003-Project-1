@@ -10,38 +10,50 @@ uniform float texScale;
 uniform vec4 LightPosition;
 uniform mat4 ModelView;
 
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform struct Light {
+    vec4 position;
+    vec3 rgb;
+    float brightness;
+    float attenuation;
+} Lights[MAX_LIGHTS];
+
 void main()
 {
-    // Unit direction vectors for Blinn-Phong shading calculation
-    vec3 lightDir = normalize(LightPosition.xyz - pos);  // Direction to the light source
-    float lightDist = length(LightPosition.xyz - pos);
-    float lightAttenuation = 5.0;
-    float attenuation = 1.0 / (1.0  + lightAttenuation * pow(lightDist, 2.0));
-    float brightness = 30.0;
+    vec4 surfaceColour = texture2D(texture, texCoord * texScale);
     
     vec3 viewDir = normalize(-pos);  // Direction to the eye/camera
-    vec3 H = normalize(lightDir + viewDir);  // Halfway vector
     vec3 N = normalize((ModelView * vec4(normal, 0.0)).xyz);  // Normal vector
-    
-    // Compute terms in the illumination equation
-    vec3 ambient =  AmbientProduct * attenuation * brightness;
-    
-    float Kd = max(dot(lightDir, N), 0.0);
-    vec3 diffuse = Kd * DiffuseProduct * attenuation * brightness;
-    
-    float Ks = pow(max(dot(N, H), 0.0), Shininess);
-    vec3 specular = Ks * SpecularProduct * attenuation * brightness;
-    
-    // discard the specular highlight if the light's behind the vertex
-    if (dot(lightDir, N) < 0.0) {
-        specular = vec3(0.0, 0.0, 0.0);
-    }
     
     // globalAmbient is independent of distance from the light source
     vec3 globalAmbient = vec3(0.1, 0.1, 0.1);
+    vec4 colour = vec4(globalAmbient, 1.0) * surfaceColour;
     
-    // Reduce point light with distance
-
-    vec4 color = vec4(globalAmbient + ambient + diffuse, 1.0);
-    gl_FragColor = vec4(specular, 1.0) + color * texture2D(texture, texCoord * texScale);
+    for(int i =0; i < numLights; i++)
+    {
+        // Unit direction vectors for Blinn-Phong shading calculation
+        vec3 lightDir = normalize(Lights[i].position.xyz - pos);  // Direction to the light source
+        vec3 halfway = normalize(lightDir + viewDir);  // Halfway vector
+        float lightDist = length(Lights[i].position.xyz - pos);
+        
+        // Reduce point light with distance
+        float attenuation = 1.0 / (1.0  + Lights[i].attenuation * pow(lightDist, 2.0));
+        
+        // Compute terms in the illumination equation
+        vec3 ambient =  AmbientProduct * surfaceColour.rgb * attenuation * Lights[i].rgb;
+        
+        float Kd = max(dot(lightDir, N), 0.0);
+        vec3 diffuse = Kd * DiffuseProduct * surfaceColour.rgb * Lights[i].rgb;
+        
+        float Ks = pow(max(dot(N, halfway), 0.0), Shininess);
+        vec3 specular = Ks * SpecularProduct * Lights[i].rgb;
+        
+        // discard the specular highlight if the light's behind the vertex
+        if (dot(lightDir, N) < 0.0) {
+            specular = vec3(0.0, 0.0, 0.0);
+        }
+        colour.rgb += attenuation * Lights[i].brightness * (ambient + diffuse + specular);
+    }
+    gl_FragColor = colour;
 }

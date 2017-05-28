@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <time.h>
+#include <sstream>
 
 // Open Asset Importer header files (in ../../assimp--3.0.1270/include)
 // This is a standard open source library for loading meshes, see gnatidread.h
@@ -64,6 +65,8 @@ typedef struct {
     int meshId;
     int texId;
     float texScale;
+    bool isLight;
+    float attenuation;
 } SceneObject;
 
 const int maxObjects = 1024; // Scenes with more than 1024 objects seem unlikely
@@ -259,10 +262,23 @@ static void addObject(int id)
     sceneObjs[nObjects].texId = rand() % numTextures;
     sceneObjs[nObjects].texScale = 2.0;
 
+    sceneObjs[nObjects].isLight = false;
+    
     toolObj = currObject = nObjects++;
     setToolCallbacks(adjustLocXZ, camRotZ(),
                      adjustScaleY, mat2(0.05, 0, 0, 10.0) );
     glutPostRedisplay();
+}
+
+static void addLight()
+{
+    addObject(55); //sphere
+    sceneObjs[nObjects-1].isLight = true;
+    sceneObjs[nObjects-1].attenuation = 5.0;
+    sceneObjs[nObjects-1].brightness = 10.0;
+    sceneObjs[nObjects-1].loc = vec4(0, 0, 0, 1.0);
+    sceneObjs[nObjects-1].scale = 0.1;
+    sceneObjs[nObjects-1].texId = 0; // Plain texture
 }
 
 //------The init function-----------------------------------------------------
@@ -301,11 +317,14 @@ void init( void )
     sceneObjs[0].angles[0] = 90.0; // Rotate it.
     sceneObjs[0].texScale = 5.0; // Repeat the texture.
 
-    addObject(55); // Sphere for the first light
+    // first light
+    addLight();
     sceneObjs[1].loc = vec4(2.0, 1.0, 1.0, 1.0);
-    sceneObjs[1].scale = 0.1;
-    sceneObjs[1].texId = 0; // Plain texture
-    sceneObjs[1].brightness = 0.2; // The light's brightness is 5 times this (below).
+    
+    // second light
+    addLight();
+    sceneObjs[2].scale = 0.2;
+    sceneObjs[2].rgb = vec3(1, 0, 0);
 
     addObject(rand() % numMeshes); // A test mesh
 
@@ -365,6 +384,17 @@ void drawMesh(SceneObject sceneObj)
 
 //----------------------------------------------------------------------------
 
+void LightUniform(int lightIndex, vec4 position, float brightness, float attenuation, vec3 rgb) {
+    std::ostringstream ss;
+    ss << "Lights[" << lightIndex << "].";
+    std::string uniformName = ss.str();
+    
+    glUniform4fv(glGetUniformLocation(shaderProgram, (uniformName + "position").c_str()), 1, position);
+    glUniform3fv(glGetUniformLocation(shaderProgram, (uniformName + "rgb").c_str()), 1, rgb);
+    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "brightness").c_str()), brightness);
+    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "attenuation").c_str()), attenuation);
+}
+
 void display( void )
 {
     numDisplayCalls++;
@@ -383,17 +413,24 @@ void display( void )
     view = view * xrot * yrot;
     //--------
     
-    SceneObject lightObj1 = sceneObjs[1]; 
-    vec4 lightPosition = view * lightObj1.loc ;
-
-    glUniform4fv( glGetUniformLocation(shaderProgram, "LightPosition"),
-                  1, lightPosition);
     CheckError();
+    
+    int numLights = 0;
+    for (int i=0; i < nObjects; i++) {
+        SceneObject so = sceneObjs[i];
+        if(so.isLight)
+        {
+            vec4 lightPosition = view * so.loc;
+            LightUniform(numLights, lightPosition, so.brightness, so.attenuation, so.rgb);
+            numLights++;
+        }
+    }
+    glUniform1i( glGetUniformLocation(shaderProgram, "numLights"), numLights );
 
     for (int i=0; i < nObjects; i++) {
         SceneObject so = sceneObjs[i];
 
-        vec3 rgb = so.rgb * lightObj1.rgb * so.brightness * lightObj1.brightness * 2.0;
+        vec3 rgb = so.rgb * so.brightness * 2.0;
         glUniform3fv( glGetUniformLocation(shaderProgram, "AmbientProduct"), 1, so.ambient * rgb );
         CheckError();
         glUniform3fv( glGetUniformLocation(shaderProgram, "DiffuseProduct"), 1, so.diffuse * rgb );
