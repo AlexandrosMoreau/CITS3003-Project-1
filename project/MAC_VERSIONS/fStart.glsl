@@ -2,12 +2,10 @@ varying vec3 pos;
 varying vec3 normal;
 varying vec2 texCoord;  // The third coordinate is always 0.0 and is discarded
 
-uniform vec3 LightColor;
 uniform vec3 AmbientProduct, DiffuseProduct, SpecularProduct;
 uniform float Shininess;
 uniform sampler2D texture;
 uniform float texScale;
-uniform vec4 LightPosition;
 uniform mat4 ModelView;
 
 #define MAX_LIGHTS 10
@@ -17,6 +15,9 @@ uniform struct Light {
     vec3 rgb;
     float brightness;
     float attenuation;
+    //float coneAngle;
+    vec3 coneDirection;
+    bool directional;
 } Lights[MAX_LIGHTS];
 
 void main()
@@ -33,12 +34,27 @@ void main()
     for(int i =0; i < numLights; i++)
     {
         // Unit direction vectors for Blinn-Phong shading calculation
-        vec3 lightDir = normalize(Lights[i].position.xyz - pos);  // Direction to the light source
-        vec3 halfway = normalize(lightDir + viewDir);  // Halfway vector
+        vec3 lightDir;
+        lightDir = normalize(Lights[i].position.xyz - pos);  // Direction to the light source
         float lightDist = length(Lights[i].position.xyz - pos);
-        
-        // Reduce point light with distance
         float attenuation = 1.0 / (1.0  + Lights[i].attenuation * pow(lightDist, 2.0));
+        
+        if(Lights[i].position.w == 0.0)
+        {
+            lightDir = normalize(Lights[i].position.xyz);
+        }
+        
+        //Directional light
+        /*if(Lights[i].directional) {
+            float coneAngle = 5.0;
+            float lightToSurfaceAngle = degrees(acos(dot(-normalize(Lights[i].position.xyz), normalize(Lights[i].coneDirection))));
+            if(lightToSurfaceAngle > coneAngle){
+                attenuation = 0.0;
+            }
+        }*/
+        
+        vec3 halfway = normalize(lightDir + viewDir);  // Halfway vector
+
         
         // Compute terms in the illumination equation
         vec3 ambient =  AmbientProduct * surfaceColour.rgb * attenuation * Lights[i].rgb;

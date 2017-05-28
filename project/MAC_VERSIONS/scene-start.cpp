@@ -66,6 +66,7 @@ typedef struct {
     int texId;
     float texScale;
     bool isLight;
+    bool directional;
     float attenuation;
 } SceneObject;
 
@@ -270,13 +271,18 @@ static void addObject(int id)
     glutPostRedisplay();
 }
 
-static void addLight()
+static void addLight(bool directional)
 {
     addObject(55); //sphere
     sceneObjs[nObjects-1].isLight = true;
+    sceneObjs[nObjects-1].directional = directional;
     sceneObjs[nObjects-1].attenuation = 5.0;
     sceneObjs[nObjects-1].brightness = 10.0;
-    sceneObjs[nObjects-1].loc = vec4(0, 0, 0, 1.0);
+    sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 1.0);
+    if(directional)
+    {
+        //sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 0);
+    }
     sceneObjs[nObjects-1].scale = 0.1;
     sceneObjs[nObjects-1].texId = 0; // Plain texture
 }
@@ -318,13 +324,15 @@ void init( void )
     sceneObjs[0].texScale = 5.0; // Repeat the texture.
 
     // first light
-    addLight();
+    addLight(false);
     sceneObjs[1].loc = vec4(2.0, 1.0, 1.0, 1.0);
     
     // second light
-    addLight();
+    addLight(true);
     sceneObjs[2].scale = 0.2;
-    sceneObjs[2].rgb = vec3(1, 0, 0);
+  //  sceneObjs[2].brightness = 40;
+//    sceneObjs[2].attenuation = 20;
+    //sceneObjs[2].rgb = vec3(1, 0, 0);
 
     addObject(rand() % numMeshes); // A test mesh
 
@@ -384,15 +392,19 @@ void drawMesh(SceneObject sceneObj)
 
 //----------------------------------------------------------------------------
 
-void LightUniform(int lightIndex, vec4 position, float brightness, float attenuation, vec3 rgb) {
+void LightUniform(int lightIndex, vec4 position, SceneObject light) {
     std::ostringstream ss;
     ss << "Lights[" << lightIndex << "].";
     std::string uniformName = ss.str();
     
+    //atan(Lights[i].position.z/length(Lights[i].position.xy));
+    
     glUniform4fv(glGetUniformLocation(shaderProgram, (uniformName + "position").c_str()), 1, position);
-    glUniform3fv(glGetUniformLocation(shaderProgram, (uniformName + "rgb").c_str()), 1, rgb);
-    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "brightness").c_str()), brightness);
-    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "attenuation").c_str()), attenuation);
+    glUniform3fv(glGetUniformLocation(shaderProgram, (uniformName + "rgb").c_str()), 1, light.rgb);
+    glUniform3fv(glGetUniformLocation(shaderProgram, (uniformName + "coneDirection").c_str()), 1, vec3(0,0,-1));
+    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "brightness").c_str()), light.brightness);
+    glUniform1f(glGetUniformLocation(shaderProgram, (uniformName + "attenuation").c_str()), light.attenuation);
+    glUniform1i(glGetUniformLocation(shaderProgram, (uniformName + "directional").c_str()), light.directional);
 }
 
 void display( void )
@@ -421,7 +433,7 @@ void display( void )
         if(so.isLight)
         {
             vec4 lightPosition = view * so.loc;
-            LightUniform(numLights, lightPosition, so.brightness, so.attenuation, so.rgb);
+            LightUniform(numLights, lightPosition, so);
             numLights++;
         }
     }
@@ -440,6 +452,9 @@ void display( void )
 
         drawMesh(sceneObjs[i]);
     }
+    
+    
+    //printf("light 1 loc.x = %f, loc.y = %f, loc.z = %f\n", sceneObjs[1].loc.x, sceneObjs[1].loc.y, sceneObjs[1].loc.z);
 
     glutSwapBuffers();
 }
