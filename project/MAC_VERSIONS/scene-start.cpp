@@ -70,6 +70,7 @@ typedef struct {
     bool isLight;
     bool directional;
     float attenuation;
+    bool deleted;
 } SceneObject;
 
 const int maxObjects = 1024; // Scenes with more than 1024 objects seem unlikely
@@ -82,6 +83,7 @@ int toolObj = -1;    // The object currently being modified
 int lights[MAX_LIGHTS];
 int nLights = 0;
 int lightMenuId;
+int deleteMenuId;
 
 //----------------------------------------------------------------------------
 //
@@ -270,11 +272,40 @@ static void addObject(int id)
     sceneObjs[nObjects].texScale = 2.0;
 
     sceneObjs[nObjects].isLight = false;
+    sceneObjs[nObjects].deleted = false;
+    
+    string name = objectMenuEntries[id-1];
+    glutSetMenu(deleteMenuId);
+    glutAddMenuEntry((to_string(nObjects) + ": " + name).c_str(), nObjects);
+    
     
     toolObj = currObject = nObjects++;
     setToolCallbacks(adjustLocXZ, camRotZ(),
                      adjustScaleY, mat2(0.05, 0, 0, 10.0) );
     glutPostRedisplay();
+}
+
+static void deleteObject(int objectN)
+{
+    sceneObjs[objectN].deleted = true;
+    sceneObjs[objectN].brightness = 0.0;
+    glutSetMenu(deleteMenuId);
+    glutChangeToMenuEntry(objectN + 1, "[Object deleted]", objectN);
+    if(sceneObjs[objectN].isLight)
+    {
+        int lightNo;
+        for(lightNo = 0; lightNo < nLights; lightNo++)
+        {
+            
+            if(lights[lightNo] == objectN)
+                break;
+        }
+        
+        glutSetMenu(lightMenuId);
+        glutChangeToMenuEntry(3 + lightNo * 2, "[Object deleted]", lightNo * 10);
+        glutChangeToMenuEntry(4 + lightNo * 2, "[Object deleted]", lightNo * 10);
+    }
+    
 }
 
 static void addLight(bool directional)
@@ -286,7 +317,7 @@ static void addLight(bool directional)
         sceneObjs[nObjects-1].isLight = true;
         sceneObjs[nObjects-1].directional = directional;
         sceneObjs[nObjects-1].attenuation = 5.0;
-        sceneObjs[nObjects-1].brightness = 10.0;
+        sceneObjs[nObjects-1].brightness = 5.0;
         sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 1.0);
         sceneObjs[nObjects-1].scale = 0.1;
         sceneObjs[nObjects-1].texId = 0; // Plain texture
@@ -294,12 +325,21 @@ static void addLight(bool directional)
         if(directional)
         {
             sceneObjs[nObjects-1].attenuation = 0.0;
-            sceneObjs[nObjects-1].brightness = 1.0;
+            sceneObjs[nObjects-1].brightness = 0.5;
             dir = " [D]";
         }
+        //light menu
         glutSetMenu(lightMenuId);
-        glutAddMenuEntry(("Move Light " + to_string(nLights+1) + dir).c_str(), 73 + nLights*2);
-        glutAddMenuEntry(("R/G/B/All Light " + to_string(nLights+1) + dir).c_str(), 74 + nLights*2);
+        string name = "Light " + to_string(nLights+1) + dir;
+        
+        //Move ID: (lightNo)(0), e.g. 50
+        glutAddMenuEntry(("Move " + name).c_str(), nLights * 10);
+        //RGB ID: (lightNo)(1), e.g. 51
+        glutAddMenuEntry(("R/G/B/All Light " + to_string(nLights+1) + dir).c_str(), nLights * 10 + 1);
+        
+        //delete menu
+        glutSetMenu(deleteMenuId);
+        glutChangeToMenuEntry(nObjects, (to_string(nObjects) + ": " + name).c_str(), nObjects-1);
         nLights++;
     }
 }
@@ -355,6 +395,7 @@ void init( void )
     // We need to enable the depth test to discard fragments that
     // are behind previously drawn fragments for the same pixel.
     glEnable( GL_DEPTH_TEST );
+    
     doRotate(); // Start in camera rotate mode.
     glClearColor( 0.0, 0.0, 0.0, 1.0 ); /* black background */
 }
@@ -457,16 +498,18 @@ void display( void )
 
     for (int i=0; i < nObjects; i++) {
         SceneObject so = sceneObjs[i];
+        if(!so.deleted)
+        {
+            vec3 rgb = so.rgb * so.brightness * 2.0;
+            glUniform3fv( glGetUniformLocation(shaderProgram, "AmbientProduct"), 1, so.ambient * rgb );
+            CheckError();
+            glUniform3fv( glGetUniformLocation(shaderProgram, "DiffuseProduct"), 1, so.diffuse * rgb );
+            glUniform3fv( glGetUniformLocation(shaderProgram, "SpecularProduct"), 1, so.specular * rgb );
+            glUniform1f( glGetUniformLocation(shaderProgram, "Shininess"), so.shine );
+            CheckError();
 
-        vec3 rgb = so.rgb * so.brightness * 2.0;
-        glUniform3fv( glGetUniformLocation(shaderProgram, "AmbientProduct"), 1, so.ambient * rgb );
-        CheckError();
-        glUniform3fv( glGetUniformLocation(shaderProgram, "DiffuseProduct"), 1, so.diffuse * rgb );
-        glUniform3fv( glGetUniformLocation(shaderProgram, "SpecularProduct"), 1, so.specular * rgb );
-        glUniform1f( glGetUniformLocation(shaderProgram, "Shininess"), so.shine );
-        CheckError();
-
-        drawMesh(sceneObjs[i]);
+            drawMesh(sceneObjs[i]);
+        }
     }
     
     
@@ -483,6 +526,12 @@ static void objectMenu(int id)
 {
     deactivateTool();
     addObject(id);
+}
+
+static void deleteObjectMenu(int id)
+{
+    deactivateTool();
+    deleteObject(id);
 }
 
 static void texMenu(int id)
@@ -535,7 +584,7 @@ static void adjustAmbientDiffuse(vec2 am_df)
 
 static void lightMenu(int id)
 {
-//    deactivateTool();
+    deactivateTool();
     if (id == 70) {
         addLight(false);
     }
@@ -545,42 +594,19 @@ static void lightMenu(int id)
     }
     
     //move
-    else if(id % 2 == 1)
+    else if(id % 2 == 0)
     {
-        toolObj = lights[(id-73)/2];
+        toolObj = lights[id/10];
         setToolCallbacks(adjustLocXZ, camRotZ(),
                          adjustBrightnessY, mat2( 1.0, 0.0, 0.0, 10.0) );
     }
     
     //RGB
-    else if(id % 2 == 0)
+    else if(id % 2 == 1)
     {
-        toolObj = lights[(id-74)/2];
+        toolObj = lights[(id-1)/10];
         setToolCallbacks(adjustRedGreen, mat2(1.0, 0, 0, 1.0),
                          adjustBlueBrightness, mat2(1.0, 0, 0, 1.0) );
-    }
-    
-    /*
-    if (id == 70) {
-        toolObj = 1;
-        setToolCallbacks(adjustLocXZ, camRotZ(),
-                         adjustBrightnessY, mat2( 1.0, 0.0, 0.0, 10.0) );
-
-    }
-    else if (id >= 71 && id <= 74) {
-        toolObj = 1;
-        setToolCallbacks(adjustRedGreen, mat2(1.0, 0, 0, 1.0),
-                         adjustBlueBrightness, mat2(1.0, 0, 0, 1.0) );
-    }
-    else if (id == 80) {
-        toolObj = 2;
-        setToolCallbacks(adjustLocXZ, camRotZ(),
-                         adjustBrightnessY, mat2( 1.0, 0.0, 0.0, 10.0) );
-        
-    }*/
-    else {
-        printf("Error in lightMenu\n");
-        exit(1);
     }
 }
 
@@ -655,6 +681,7 @@ static void mainmenu(int id)
     if (id == 99) exit(0);
 }
 
+
 static void makeMenu()
 {
     int objectId = createArrayMenu(numMeshes, objectMenuEntries, objectMenu);
@@ -669,16 +696,13 @@ static void makeMenu()
     lightMenuId = glutCreateMenu(lightMenu);
     glutAddMenuEntry("Add point light",70);
     glutAddMenuEntry("Add directional light",71);
-/*
-    glutAddMenuEntry("Move Light 1",70);
-    glutAddMenuEntry("R/G/B/All Light 1",71);
-    glutAddMenuEntry("Move Light 2",80);
-    glutAddMenuEntry("R/G/B/All Light 2",81);
-*/
- 
+    
+    deleteMenuId = glutCreateMenu(deleteObjectMenu);
+    
     glutCreateMenu(mainmenu);
     glutAddMenuEntry("Rotate/Move Camera",50);
     glutAddSubMenu("Add object", objectId);
+    glutAddSubMenu("Delete object", deleteMenuId);
     glutAddMenuEntry("Position/Scale", 41);
     glutAddMenuEntry("Rotation/Texture Scale", 55);
     glutAddSubMenu("Material", materialMenuId);

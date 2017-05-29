@@ -17,6 +17,7 @@ uniform struct Light {
     float attenuation;
     bool directional;
     float angle;
+    vec3 coneDirection;
 } Lights[MAX_LIGHTS];
 
 void main()
@@ -39,15 +40,19 @@ void main()
         float brightness = Lights[i].brightness;
         vec3 lightColour = Lights[i].rgb;
 
+        
         //Directional light
         if(Lights[i].directional) {
-            float angleModifier = abs(degrees(Lights[i].angle)/90.0);
+            //ratio used to replicate sun angle in the sky
+            float angleModifier = degrees(Lights[i].angle)/90.0;
             brightness = brightness * angleModifier;
+            
+            //simulate sunset colours
             lightColour.r = colour.r +(200.0 + 55.0*angleModifier)/255.0;
             lightColour.g = colour.g +(125.0 + 130.0*angleModifier)/255.0;
             lightColour.b = colour.b +(90.0 + 165.0*angleModifier)/255.0;
         }
-        
+    
         vec3 halfway = normalize(lightDir + viewDir);  // Halfway vector
 
         
