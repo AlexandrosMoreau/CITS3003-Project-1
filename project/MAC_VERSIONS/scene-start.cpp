@@ -19,6 +19,8 @@ GLint windowHeight=640, windowWidth=960;
 // to modify (but, you can).
 #include "gnatidread.h"
 
+#define MAX_LIGHTS 10
+
 using namespace std;        // Import the C++ standard functions (e.g., min) 
 
 
@@ -76,6 +78,10 @@ SceneObject sceneObjs[maxObjects]; // An array storing the objects currently in 
 int nObjects = 0;    // How many objects are currenly in the scene.
 int currObject = -1; // The current object
 int toolObj = -1;    // The object currently being modified
+
+int lights[MAX_LIGHTS];
+int nLights = 0;
+int lightMenuId;
 
 //----------------------------------------------------------------------------
 //
@@ -273,18 +279,28 @@ static void addObject(int id)
 
 static void addLight(bool directional)
 {
-    addObject(55); //sphere
-    sceneObjs[nObjects-1].isLight = true;
-    sceneObjs[nObjects-1].directional = directional;
-    sceneObjs[nObjects-1].attenuation = 5.0;
-    sceneObjs[nObjects-1].brightness = 10.0;
-    sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 1.0);
-    sceneObjs[nObjects-1].scale = 0.1;
-    sceneObjs[nObjects-1].texId = 0; // Plain texture
-    if(directional)
+    if(nLights < MAX_LIGHTS)
     {
-        sceneObjs[nObjects-1].attenuation = 0.0;
-        sceneObjs[nObjects-1].brightness = 1.0;
+        lights[nLights] = nObjects;
+        addObject(55); //sphere
+        sceneObjs[nObjects-1].isLight = true;
+        sceneObjs[nObjects-1].directional = directional;
+        sceneObjs[nObjects-1].attenuation = 5.0;
+        sceneObjs[nObjects-1].brightness = 10.0;
+        sceneObjs[nObjects-1].loc = vec4(0, 1.0, 0, 1.0);
+        sceneObjs[nObjects-1].scale = 0.1;
+        sceneObjs[nObjects-1].texId = 0; // Plain texture
+        string dir = "";
+        if(directional)
+        {
+            sceneObjs[nObjects-1].attenuation = 0.0;
+            sceneObjs[nObjects-1].brightness = 1.0;
+            dir = " [D]";
+        }
+        glutSetMenu(lightMenuId);
+        glutAddMenuEntry(("Move Light " + to_string(nLights+1) + dir).c_str(), 73 + nLights*2);
+        glutAddMenuEntry(("R/G/B/All Light " + to_string(nLights+1) + dir).c_str(), 74 + nLights*2);
+        nLights++;
     }
 }
 
@@ -327,14 +343,10 @@ void init( void )
     // first light
     addLight(false);
     sceneObjs[1].loc = vec4(2.0, 1.0, 1.0, 1.0);
-    sceneObjs[1].brightness = 0.0;
     
     // second light
     addLight(true);
     sceneObjs[2].scale = 0.2;
-    //sceneObjs[2].brightness = 1.0;
-    //sceneObjs[2].attenuation = 0.0;
-    //sceneObjs[2].rgb = vec3(1, 0, 0);
 
     addObject(rand() % numMeshes); // A test mesh
     //addObject(42); // A test mesh
@@ -523,7 +535,32 @@ static void adjustAmbientDiffuse(vec2 am_df)
 
 static void lightMenu(int id)
 {
-    deactivateTool();
+//    deactivateTool();
+    if (id == 70) {
+        addLight(false);
+    }
+    
+    else if (id == 71) {
+        addLight(true);
+    }
+    
+    //move
+    else if(id % 2 == 1)
+    {
+        toolObj = lights[(id-73)/2];
+        setToolCallbacks(adjustLocXZ, camRotZ(),
+                         adjustBrightnessY, mat2( 1.0, 0.0, 0.0, 10.0) );
+    }
+    
+    //RGB
+    else if(id % 2 == 0)
+    {
+        toolObj = lights[(id-74)/2];
+        setToolCallbacks(adjustRedGreen, mat2(1.0, 0, 0, 1.0),
+                         adjustBlueBrightness, mat2(1.0, 0, 0, 1.0) );
+    }
+    
+    /*
     if (id == 70) {
         toolObj = 1;
         setToolCallbacks(adjustLocXZ, camRotZ(),
@@ -540,7 +577,7 @@ static void lightMenu(int id)
         setToolCallbacks(adjustLocXZ, camRotZ(),
                          adjustBrightnessY, mat2( 1.0, 0.0, 0.0, 10.0) );
         
-    }
+    }*/
     else {
         printf("Error in lightMenu\n");
         exit(1);
@@ -629,12 +666,16 @@ static void makeMenu()
     int texMenuId = createArrayMenu(numTextures, textureMenuEntries, texMenu);
     int groundMenuId = createArrayMenu(numTextures, textureMenuEntries, groundMenu);
 
-    int lightMenuId = glutCreateMenu(lightMenu);
+    lightMenuId = glutCreateMenu(lightMenu);
+    glutAddMenuEntry("Add point light",70);
+    glutAddMenuEntry("Add directional light",71);
+/*
     glutAddMenuEntry("Move Light 1",70);
     glutAddMenuEntry("R/G/B/All Light 1",71);
     glutAddMenuEntry("Move Light 2",80);
     glutAddMenuEntry("R/G/B/All Light 2",81);
-
+*/
+ 
     glutCreateMenu(mainmenu);
     glutAddMenuEntry("Rotate/Move Camera",50);
     glutAddSubMenu("Add object", objectId);
@@ -748,6 +789,7 @@ int main( int argc, char* argv[] )
     // glewInit(); // With some old hardware yields GL_INVALID_ENUM, if so use glewExperimental.
     CheckError(); // This bug is explained at: http://www.opengl.org/wiki/OpenGL_Loading_Library
 
+    makeMenu();
     init();
     CheckError();
 
@@ -763,7 +805,6 @@ int main( int argc, char* argv[] )
     glutTimerFunc( 1000, timer, 1 );
     CheckError();
 
-    makeMenu();
     CheckError();
 
     glutMainLoop();
