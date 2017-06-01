@@ -43,7 +43,6 @@ mat4 view; // View matrix - set in the display function.
 char lab[] = "Project1";
 char *programName = NULL; // Set in main 
 int numDisplayCalls = 0; // Used to calculate the number of frames per second
-float fps = 0.0;
 
 //------Meshes----------------------------------------------------------------
 // Uses the type aiMesh from ../../assimp--3.0.1270/include/assimp/mesh.h
@@ -76,11 +75,12 @@ typedef struct {
     bool directional;
     float attenuation;
     bool deleted;
-    float duration = 0.0; //animation duration in ms
+    float durationTicks = 0.0; //animation duration in ticks
+    float ticksPerSecond = 0.0; //ticks per second for the animation
     float startTime = 0.0; //the time the object was added to the scene
     float framesPassed = 0.0; //number of frames passed in current animation cycle
-    int moveTime = 3;
-    int moveDistance = 1;
+    float moveTime = 1.0;
+    float moveDistance = 1.0;
 } SceneObject;
 
 const int maxObjects = 1024; // Scenes with more than 1024 objects seem unlikely
@@ -482,15 +482,12 @@ void drawMesh(SceneObject& sceneObj)
     //get animation info
     if(scenes[sceneObj.meshId]->HasAnimations())
     {
-        double ticksPerSecond = scenes[sceneObj.meshId]->mAnimations[0]->mTicksPerSecond;
-        double duration = scenes[sceneObj.meshId]->mAnimations[0]->mDuration;
-        sceneObj.duration = 1000 * duration/ticksPerSecond;
+        sceneObj.ticksPerSecond = scenes[sceneObj.meshId]->mAnimations[0]->mTicksPerSecond;
+        sceneObj.durationTicks = scenes[sceneObj.meshId]->mAnimations[0]->mDuration;
         if(sceneObj.startTime == 0.0)
         {
             sceneObj.startTime = glutGet(GLUT_ELAPSED_TIME);
         }
-        //printf("animationelaspedtime %f, duration %f, startime %f\n",0.0, sceneObj.duration, sceneObj.startTime);
-//        printf("duration %f\n", sceneObj.duration);
     }
 
     //*************
@@ -578,10 +575,11 @@ void display( void )
             glUniform1f( glGetUniformLocation(shaderProgram, "Shininess"), so.shine );
             CheckError();
             
-            if(so.duration > 0.0)
+            if(so.durationTicks > 0.0)
             {
                 float elapsedTime = glutGet(GLUT_ELAPSED_TIME) - so.startTime;
-                float animationElapsedTime = fmod(elapsedTime, so.duration);
+                float durationMS = 1000 * so.durationTicks/so.ticksPerSecond;
+                float animationElapsedTime = fmod(elapsedTime, durationMS);
                 
                 //---------
                 mat4 model = Translate(so.loc) * Scale(so.scale);
@@ -591,12 +589,11 @@ void display( void )
                 model = model * xrot * yrot * zrot;
                 //--------
                 
-                vec4 movement = vec4(0.0, 0.0, so.moveDistance*pow(-1, (elapsedTime-animationElapsedTime)/so.duration), 0.0);
+                float direction = -sin(elapsedTime/2000 * PI * (so.moveDistance/so.moveTime));
+                vec4 movement = vec4(0.0, 0.0, 2 * so.moveDistance * direction, 0.0);
                 sceneObjs[i].loc += model * movement;
-                sceneObjs[i].framesPassed = fps * animationElapsedTime/1000;
-                
-                
-                printf("frames: %f, animationelaspedtime %f, duration %f, startime %f\n", so.framesPassed, animationElapsedTime, so.duration, so.startTime);
+                sceneObjs[i].framesPassed = so.ticksPerSecond * animationElapsedTime/1000;
+
             }
             
             drawMesh(sceneObjs[i]);
@@ -666,6 +663,18 @@ static void adjustAmbientDiffuse(vec2 am_df)
 {
     sceneObjs[toolObj].ambient+=am_df[0];
     sceneObjs[toolObj].diffuse+=am_df[1];
+}
+
+static void adjustMoveTime(vec2 tm)
+{
+    sceneObjs[toolObj].moveTime+=tm[0];
+    sceneObjs[toolObj].moveTime+=tm[1];
+}
+
+static void adjustMoveDist(vec2 ds)
+{
+    sceneObjs[toolObj].moveDistance+=ds[0];
+    sceneObjs[toolObj].moveDistance+=ds[1];
 }
 
 
@@ -766,6 +775,10 @@ static void mainmenu(int id)
         setToolCallbacks(adjustAngleYX, mat2(400, 0, 0, -400),
                          adjustAngleZTexscale, mat2(400, 0, 0, 15) );
     }
+    if (id == 90 && currObject>=0) {
+        setToolCallbacks(adjustMoveTime, mat2(10, 0, 0, 10),
+                         adjustMoveDist, mat2(10, 0, 0, 10) );
+    }
     if (id == 99) exit(0);
 }
 
@@ -797,6 +810,7 @@ static void makeMenu()
     glutAddSubMenu("Texture",texMenuId);
     glutAddSubMenu("Ground Texture",groundMenuId);
     glutAddSubMenu("Lights",lightMenuId);
+    glutAddMenuEntry("Walk Duration/Distance", 90);
     glutAddMenuEntry("EXIT", 99);
     glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
@@ -850,8 +864,6 @@ void timer(int unused)
                     lab, programName, numDisplayCalls, windowWidth, windowHeight );
 
     glutSetWindowTitle(title);
-
-    fps = numDisplayCalls;
     numDisplayCalls = 0;
     glutTimerFunc(1000, timer, 1);
 }
