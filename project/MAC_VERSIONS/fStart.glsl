@@ -1,5 +1,5 @@
 varying vec3 pos;
-varying vec3 normal;
+varying vec4 normal;
 varying vec2 texCoord;  // The third coordinate is always 0.0 and is discarded
 
 uniform vec3 AmbientProduct, DiffuseProduct, SpecularProduct;
@@ -17,7 +17,6 @@ uniform struct Light {
     float attenuation;
     bool directional;
     float angle;
-    vec3 coneDirection;
 } Lights[MAX_LIGHTS];
 
 void main()
@@ -25,7 +24,7 @@ void main()
     vec4 surfaceColour = texture2D(texture, texCoord * texScale);
     
     vec3 viewDir = normalize(-pos);  // Direction to the eye/camera
-    vec3 N = normalize((ModelView * vec4(normal, 0.0)).xyz);  // Normal vector
+    vec3 N = normalize((ModelView * normal).xyz);  // Normal vector
     
     // globalAmbient is independent of distance from the light source
     vec3 globalAmbient = vec3(0.1, 0.1, 0.1);
